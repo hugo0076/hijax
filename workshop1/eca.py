@@ -1,8 +1,6 @@
 """
 Elementary cellular automata simulator in numpy.
 """
-
-
 import itertools
 import pathlib
 import time
@@ -81,7 +79,11 @@ def simulate(
     # parse rule
     rule_uint8 = np.uint8(rule)
     rule_bits = np.unpackbits(rule_uint8, bitorder='little')
+    print("rule bits:")
+    print(rule_bits)
     rule_table = rule_bits.reshape(2,2,2)
+    print("rule table:")
+    print(rule_table)
 
     # parse initial state
     init_state = np.asarray(init_state, dtype=np.uint8)
