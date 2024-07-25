@@ -28,7 +28,47 @@ def main(
     learning_rate: float = 0.01,
     seed: int = 0,
 ):
-    pass # TODO!
+    key = jax.random.key(seed)
+
+    # initialise weights
+    key, key_init_w = jax.random.split(key)
+    w = init_params(key_init_w)
+
+    key, key_init_w_true = jax.random.split(key)
+    w_true = init_params(key_init_w_true)
+    print(f"true weights: {w_true}")
+    print(vis(w=w, w_true=w_true, overwrite=False))
+
+    for t in tqdm.trange(num_steps):
+        key, key_sample = jax.random.split(key)
+        x = jax.random.normal(key_sample)
+        y = forward_pass(w_true, x)
+
+        # compute loss
+        loss = loss_fn(w, x, y)
+        grad = jax.grad(loss_fn)(w, x, y)
+
+        # update weights
+        w = (w[0] - learning_rate * grad[0], w[1] - learning_rate * grad[1])
+
+        # visualise
+        figs = vis(x=x, w=w, w_true=w_true, overwrite=True)
+        tqdm.tqdm.write(figs)
+        tqdm.tqdm.write(f"x: {x:.2f}, y: {y:.2f}, loss: {loss:.2f}")
+        time.sleep(0.01)
+
+def init_params(key):
+    key_weight, key_bias = jax.random.split(key)
+    a = jax.random.normal(key_weight)
+    b = jax.random.normal(key_bias)
+    return (a, b)
+
+
+def forward_pass(w, x):
+    return w[0] * x + w[1]
+
+def loss_fn(w, x, y):
+    return jnp.mean((forward_pass(w, x) - y) ** 2)
 
 
 # # # 
