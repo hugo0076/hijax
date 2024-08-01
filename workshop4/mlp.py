@@ -70,30 +70,48 @@ class SimpLeNet(eqx.Module):
 
 
     def __init__(self, key: PRNGKeyArray):
-        raise NotImplementedError
+        k1, k2, k3, k4, k5 = jax.random.split(key, 5)
+        self.C1 = eqx.nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, key=k1)
+        self.S2 = Subsample2x2(num_channels=6)
+        self.C3 = eqx.nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5, key=k2)
+        self.S4 = Subsample2x2(num_channels=16)
+        self.C5 = eqx.nn.Conv2d(in_channels=16, out_channels=120, kernel_size=5, key=k3)
+        self.F6 = eqx.nn.Linear(in_features=120, out_features=84, key=k4)
+        self.Out = eqx.nn.Linear(in_features=84, out_features=10, key=k5)
+
 
 
     def forward(
         self,
         image: Float[Array, "28 28"],
     ) -> Float[Array, "10"]:
-        raise NotImplementedError
         # Input:         1x28x28
+        x = einops.rearrange(image, 'h w -> 1 h w')
         # C1:       ->   6x28x28
+        x = scaled_tanh(self.C1(x))
         # S2:       ->   6x14x14
+        x = scaled_tanh(self.S2(x))
         # C3*:      ->  16x10x10 (note: fully connected channels)
+        x = scaled_tanh(self.C3(x))
         # S4:       ->  16x5x5
+        x = scaled_tanh(self.S4(x))
         # C5:       -> 120x1x1 (note: equiv. dense 400->120 at this size)
+        x = scaled_tanh(self.C5(x))
         # (flatten) -> 120
+        # x = einops.rearrange(x, 'c h w -> (c h w)')
+        x = jnp.ravel(x)  # alternative
         # F6:       -> 84
+        x = scaled_tanh(self.F6(x))
         # Output*:  -> 10 (note: learned map, no hand-made RBF code)
+        x = self.Out(x)
+        return jax.nn.softmax(x)
 
 
     def forward_batch(
         self,
         x_batch: Float[Array, "b 28 28"],
     ) -> Float[Array, "b 10"]:
-        raise NotImplementedError
+        return jax.vmap(self.forward)(x_batch)
 
 
 def scaled_tanh(x):
@@ -143,13 +161,13 @@ def main(
         pass
     # configure optimiser
     if opt == 'sgd':
-        pass
+        optimiser = optax.sgd(learning_rate)
     elif opt == 'adam':
-        pass
+        optimiser = optax.adam(learning_rate)
     elif opt == 'adamw':
-        pass
+        optimiser = optax.adamw(learning_rate)
     # initialise the optimiser state
-    pass
+    opt_state = optimiser.init(model.parameters())
     
     print(opt_state)
 
@@ -216,7 +234,9 @@ def batch_cross_entropy(
     x_batch: Float[Array, "b h w"],
     y_batch: Int[Array, "b"],
 ) -> float:
-    raise NotImplementedError
+    vmapped_cross_entropy = jax.vmap(cross_entropy, in_axes=(None, 0, 0))
+    all_losses = vmapped_cross_entropy(model, x_batch, y_batch)
+    return jnp.mean(all_losses)
 
 
 def cross_entropy(
@@ -225,7 +245,7 @@ def cross_entropy(
     y: int,
 ) -> float:
     # Cross entropy formula: Hx(q, p) = - Sum_i p(i) log q(i)
-    raise NotImplementedError
+    -jnp.log(model.forward(x)[y])
 
 
 # def cross_entropy(
